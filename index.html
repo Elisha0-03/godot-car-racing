@@ -95,6 +95,29 @@ body {
 			<div id="status-notice"></div>
 		</div>
 
+		<script>
+// Fetch shim: the 35 MB engine file is stored gzipped (index.wasm.gz, 8 MB)
+// because GitHub's web upload caps files at 25 MB. Intercept the engine's
+// request for index.wasm, fetch the gzipped file, decompress it in the
+// browser, and hand the raw wasm bytes back with the right MIME type.
+(function () {
+	const nativeFetch = window.fetch.bind(window);
+	window.fetch = function (input, init) {
+		const url = typeof input === 'string' ? input : (input && input.url) || '';
+		if (url.endsWith('index.wasm')) {
+			return nativeFetch('index.wasm.gz').then(async (res) => {
+				if (!res.ok) { return res; }
+				const buf = await res.arrayBuffer();
+				const out = await new Response(
+					new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))
+				).arrayBuffer();
+				return new Response(out, { headers: { 'content-type': 'application/wasm' } });
+			});
+		}
+		return nativeFetch(input, init);
+	};
+})();
+</script>
 		<script src="index.js"></script>
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":39776,"index.wasm":35376909},"focusCanvas":true,"gdextensionLibs":[]};
